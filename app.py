@@ -1,10 +1,5 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-import io
-import matplotlib.pyplot as plt
-import contextily as cx
-from PIL import Image
-import requests
 
 app = Flask(__name__)
 

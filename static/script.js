@@ -1,37 +1,61 @@
 // Initial Coordinates
-var ibc_center = [12.934533, 77.612204];  // Latitude, Longitude
+var ibc_center = [12.933083, 77.602064];  // Latitude, Longitude
 
 // Map Options
 var mapOptions = {
     zoom_start: 16,      // Initial zoom level
-    min_zoom: 16,        // Minimum zoom level
-    max_zoom: 16,        // Maximum zoom level
-    zoomControl: false   // Disable zoom control buttons
+    min_zoom: 16,
+    max_zoom: 16,
+    zoomControl: false
 };
 
 // Initialize the map with options
-var map = L.map('map', mapOptions).setView(ibc_center, 16); // Use ibc_center and zoom from mapOptions
+var map = L.map('map', mapOptions).setView(ibc_center, 16);
 
 // Add a tile layer (OpenStreetMap)
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, // Keep this at 19 for the tile layer's max zoom. Or increase as needed.
+    maxZoom: 16,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
 // Marker setup:  Make it draggable!
 var marker = L.marker(ibc_center, { draggable: true }).addTo(map);
 
-// Function to display coordinates (can be updated to display in a specific element)
-function displayCoordinates(lat, lng) {
-    console.log("displayCoordinates called with:", lat, lng); // ADD THIS LINE
-    // Optionally, update HTML elements to show the coordinates:
-    document.getElementById("latitude").textContent = lat.toFixed(6); //Show values on HTML page with 6 decimals
-    document.getElementById("longitude").textContent = lng.toFixed(6);
+// 1km boundary setup
+var boundary; // Declare boundary outside the functions
 
+function createBoundary(lat, lng) {
+    const latOffset = 0.005;
+    const lngOffset = 0.005;
+
+    const corner1 = [lat - latOffset, lng - lngOffset];
+    const corner2 = [lat + latOffset, lng + lngOffset];
+
+    return L.rectangle([corner1, corner2], {
+        color: 'red',
+        weight: 1,
+        fillColor: 'transparent',
+        fillOpacity: 0
+    });
 }
 
-// Initial display of coordinates
-displayCoordinates(ibc_center[0], ibc_center[1]);
+// Function to display coordinates (can be updated to display in a specific element)
+function displayCoordinates(lat, lng) {
+    console.log("displayCoordinates called with:", lat, lng);
+    document.getElementById("latitude").textContent = lat.toFixed(6);
+    document.getElementById("longitude").textContent = lng.toFixed(6);
+
+    // Update Boundary on each move (including initial move)
+    if (boundary) {
+        map.removeLayer(boundary);  // Remove the old boundary
+        console.log("Boundary removed");
+    }
+    boundary = createBoundary(lat, lng).addTo(map); // Create and add new boundary
+    console.log("Boundary added");
+}
+
+// Initial display of coordinates and boundary
+displayCoordinates(ibc_center[0], ibc_center[1]);  // Now handled by marker drag and autocomplete
 
 // Add event listener for marker dragend
 marker.on('dragend', function(event) {
@@ -56,26 +80,24 @@ searchInput.addEventListener('input', function() {
         return;
     }
 
-    // Corrected fetch URL:  ADD &countrycodes=in
     fetch(`/autocomplete?q=${query}&countrycodes=in`)
         .then(response => response.json())
         .then(data => {
-            suggestionsList.innerHTML = ''; // Clear previous suggestions
+            suggestionsList.innerHTML = '';
             data.forEach(suggestion => {
                 const listItem = document.createElement('li');
                 listItem.textContent = suggestion.display_name;
                 listItem.addEventListener('click', function(event) {
                     event.preventDefault();
 
-                    suggestionsList.innerHTML = ''; // Clear suggestions 
+                    suggestionsList.innerHTML = '';
 
                     searchInput.value = suggestion.display_name;
-                    //Convert Suggestion to Float
 
-                     let latitude = parseFloat(suggestion.latitude)
-                     let longitude = parseFloat(suggestion.longitude)
+                    let latitude = parseFloat(suggestion.latitude)
+                    let longitude = parseFloat(suggestion.longitude)
 
-                     if (isNaN(latitude) || isNaN(longitude)) {
+                    if (isNaN(latitude) || isNaN(longitude)) {
                         console.error("Invalid latitude or longitude from suggestion:", suggestion);
                         return;
                     }
@@ -83,7 +105,7 @@ searchInput.addEventListener('input', function() {
                     marker.setLatLng([latitude, longitude]);
                     map.panTo([latitude, longitude]);
                     displayCoordinates(latitude, longitude);
-                    console.log("displayCoordinates from suggestion click Latitude:", latitude, "Longitude",longitude);// See if gets here!
+                    console.log("displayCoordinates from suggestion click Latitude:", latitude, "Longitude",longitude);
 
                 });
                 suggestionsList.appendChild(listItem);
@@ -91,7 +113,7 @@ searchInput.addEventListener('input', function() {
         })
         .catch(error => {
             console.error('Error fetching autocomplete suggestions:', error);
-            suggestionsList.innerHTML = ''; // Clear suggestions on error
+            suggestionsList.innerHTML = '';
         });
 });
 
@@ -102,58 +124,12 @@ getMapImageButton.addEventListener('click', function() {
     const lat = document.getElementById("latitude").textContent;
     const lng = document.getElementById("longitude").textContent;
 
-    //Check if coordinates are there
     if (isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
         console.error("Invalid latitude or longitude");
-        alert("Please select a valid location first."); // Or display a better error message
+        alert("Please select a valid location first.");
         return;
     }
 
-
-    const imageUrl = `/get_map_image?lat=${lat}&lng=${lng}`; // Build URL
-    window.open(imageUrl, '_blank');  // Open the image URL in a new tab
+    const imageUrl = `/get_map_image?lat=${lat}&lng=${lng}`;
+    window.open(imageUrl, '_blank');
 });
-
-// // Prevent form submission on Enter key (optional, but good for UX)
-// const searchForm = document.getElementById('search-form');
-// searchForm.addEventListener('submit', function(event) {
-//     //Update Marker from server side geocoding with nominatim
-//         event.preventDefault();  // Prevent default form submission
-
-//         const query = searchInput.value; //Get user's search query
-
-//         //Make a request to your Flask app endpoint
-//         fetch('/', {
-//             method:'POST', //Assuming your form uses post
-//             headers: {
-//                 'Content-Type': 'application/x-www-form-urlencoded',
-//             },
-//             body: 'search_query=' + encodeURIComponent(query), // Send the search query
-//         })
-//         .then (response => {
-//             if (!response.ok) {
-//                 throw new Error('Network response was not ok');
-//             }
-//             return response.text(); // Get the HTML content of the page
-
-//         })
-//         .then(html => {
-//                 // Parse the HTML to find latitude and longitude
-//             const parser = new DOMParser();
-//             const doc = parser.parseFromString(html, 'text/html');
-
-//             // Get Latitiude and Longitude
-//             let latitude = doc.getElementById('latitude').textContent;
-//             let longitude = doc.getElementById('longitude').textContent;
-
-//             //Update map
-//             marker.setLatLng([parseFloat(latitude), parseFloat(longitude)]);
-//             map.panTo([parseFloat(latitude), parseFloat(longitude)]);
-//             displayCoordinates(latitude, longitude);
-//         })
-//         .catch(error => {
-//             console.error('There was a problem with the fetch operation:', error);
-
-//         });
-
-// });
